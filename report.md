@@ -161,10 +161,10 @@ tpd_a0_y1 = 1.760e-10 s   (trig = 40.05 ns, targ = 40.226 ns)
 
 ```
 I_avg = -6.209e-08 A   over [160 ns, 320 ns]
-P_avg = 62.1 pW
+P_avg = 6.208868e-08 W = 62.1 nW   (= 62 088.68 pW)
 ```
 
-**P_avg ≈ 62 pW** for the healthy decoder with unloaded outputs. The value is small because
+**P_avg ≈ 62 nW** for the healthy decoder with unloaded outputs. The value is small because
 level-1 devices at 45 nm have very small parasitic capacitances and no external load is attached;
 it scales linearly with added load capacitance.
 
@@ -220,11 +220,18 @@ y3_mask = 1.000   n3_mask = 0.000   n3float_mask = 2.30e-08   (~ 0)
 **Interpretation.** `N3 = NAND(EN,A1,A0)`. The vector `EN=1,A1=1,A0=1` drives healthy `N3` to 0,
 so healthy `Y3 = 1` — identical to the faulty `Y3 = 1`. The SA0 is therefore *masked* by that
 vector and cannot be used as a test. The vector `EN=1,A1=0,A0=0` drives healthy `N3` to 1, so
-healthy `Y3 = 0`, while the faulty `Y3` stays at 1. This is the **only** tested vector that makes
-the fault observable, and it is the one applied.
+healthy `Y3 = 0`, while the faulty `Y3` stays at 1: this vector makes the fault observable, and
+it is the one applied.
 
 Faulty-circuit transient metrics are essentially unchanged on the Y1 path (`t_pd ≈ 176 ps`), with
-average power ≈ 55 pW.
+average power ≈ 55 nW (exactly 54.54411 nW).
+
+**Fault coverage note.** SA0 on `N3` is actually detectable by **7 of the 8 input vectors**.
+Since the faulty `Y3 = 1` permanently, a vector masks the fault only when the healthy `Y3 = 1`
+too, i.e. only at `EN=1, A1=1, A0=1`; every other vector (including all four `EN=0` vectors,
+where healthy `Y3 = 0` and faulty `Y3 = 1`) detects it. The vector `EN=1,A1=0,A0=0` applied here
+is one of the seven valid sensitizing vectors, chosen deliberately for the demonstration, not
+because it is the only one.
 
 ---
 
@@ -249,10 +256,135 @@ ngspice -b decoder_healthy.sp 2>&1 | grep -E "tt_|tpd|p_avg|v_il|v_ih"
 ngspice -b decoder_dft_sa0.sp 2>&1 | grep -E "y3_|n3_|n3float|tpd|p_avg"
 ```
 
-## 10. Conclusion
+## 10. Theoretical vs. measured comparison
+
+The level-1 MOSFET models used in this project are a **first-order abstraction** and do not
+capture all physical effects of a real 45 nm process. This section compares the measured
+results against theoretical expectations and explains why they differ.
+
+### 10.1 Propagation delay
+
+| | Value |
+|---|---|
+| Measured `t_pd` (A0↑→Y1↑) | **176.04 ps** |
+| Real-45 nm expectation (3 stages × 15–25 ps) | ≈ 45–75 ps |
+| Gap | **2.4–4× slower** |
+
+The path `A0 → inv → nand3 → inv → Y1` is three stages, so the per-stage delay is
+≈ 59 ps. A real 45 nm inverter has `t_pd ≈ 15–25 ps`. The level-1 model is slower because:
+
+- **Quadratic, not velocity-saturated, I–V.** Level-1 uses `I_D ∝ (V_GS − V_T)²` above
+  saturation. Real 45 nm devices are velocity-saturated, `I_D ≈ v_sat·C_ox·W·(V_GS − V_T)`,
+  a linear cap that is much lower than the quadratic extrapolation at high overdrive.
+  Level-1 has no velocity-saturation parameter at all.
+- **Higher threshold voltage.** `VTO = 0.45 V` vs. ≈ 0.25–0.35 V for real 45 nm. The
+  overdrive `(V_GS − V_T)` is therefore ~30–40 % smaller, and current scales with its square.
+- **Thicker oxide.** `TOX = 2 nm` vs. ≈ 1.2–1.5 nm EOT for real 45 nm, giving lower `C_ox`
+  and proportionally lower drive.
+- **Lower transconductance parameter.** `KP = 120 µA/V²` (NMOS) vs. ≈ 260–520 µA/V² for
+  real µ_n (200–400 cm²/V·s) and `C_ox ≈ 13 fF/µm²`. The drive is roughly halved.
+
+The 176 ps figure is therefore a first-order estimate, exactly as §8 states.
+
+### 10.2 Average power
+
+| | Value |
+|---|---|
+| Measured `P_avg` (healthy) | **62.09 nW** |
+| Measured `P_avg` (faulty) | **54.54 nW** (−12 %) |
+| Simulated frequency | 6.25 MHz |
+
+The effective switched capacitance is `C_eff = P/(V²·f) ≈ 62.09 nW / (1 V² × 6.25 MHz)
+≈ 9.9 fF`, consistent with gate + overlap (`CGSO`/`CGDO`) capacitance only. Level-1 omits
+two components that dominate real 45 nm power:
+
+- **Gate tunnelling current.** At Tox ≈ 1.2 nm, direct tunnelling is ~0.1–1 nA **per
+  transistor**, i.e. ≈ 3.6–36 nW of time-independent leakage at 1 V for 36 devices. Level-1
+  is a classical drift model with **zero** gate current.
+- **Junction capacitance.** `CJ`/`CJSW` are present in the model cards but with zero
+  source/drain area (`AS = 0`) they contribute nothing; real layout has non-zero S/D area
+  and would add ~50–100 % to the switched capacitance.
+
+The model therefore gives **100 % dynamic, 0 % leakage** — the measured value is a lower
+bound, not a silicon prediction. At 6.25 MHz a real chip would show a mixed figure: a
+similar dynamic component plus a leakage floor that dominates as frequency drops.
+
+The faulty-circuit `−12 %` reduction (`−7.55 nW`) is **physically correct**: with `N3`
+clamped to 0, the `Y3` inverter's input is permanently low, its PMOS is always on and NMOS
+always off, so **Y3 never switches** and its dynamic power vanishes. The `Xnand3` gate
+still toggles (driving `N3_floating`), so only the Y3 *inverter*'s power is saved — one
+inverter's share of 62.09 nW across 6 inverters is ≈ 10.3 nW, consistent with the observed
+7.55 nW. The direction and magnitude match theory, so this is a genuine result, not an
+artifact.
+
+### 10.3 Noise margins
+
+| Path | Measured V_IL / V_IH | Measured NM_L / NM_H |
+|---|---|---|
+| `Y0` (inverting A0) | 480.2 / 509.8 mV | ≈ 480 / 490 mV |
+| `xdec.n1` (NAND stage) | 463.9 / 499.9 mV | ≈ 464 / 500 mV |
+
+The unity-gain (slope = −1) criterion gives the *maximum possible* noise margin; for an
+ideal infinite-gain inverter `V_IL → 0`, `V_IH → V_DD`, so `NM_max = V_DD/2 = 500 mV`. The
+measured 480–500 mV is within 10–20 mV of that ceiling. Real 45 nm inverters give
+`NM ≈ 150–300 mV` because of finite small-signal gain, DIBL (drain-induced barrier
+lowering lowers `V_t` as `V_DS` rises), body effect, and `V_OL ≠ 0` / `V_OH ≠ V_DD`.
+Level-1 includes none of these degradations, so its transfer curves are **steep and
+near-ideal** and the noise margins are **optimistic by roughly a factor of 2**.
+
+### 10.4 NAND3 switching threshold — β-ratio theory confirms the measurement
+
+The one place where theory and measurement agree to three significant figures is the
+switching (50 %) voltage of the `xdec.n1` NAND gate.
+
+Measured: `V_sp = (V_IL + V_IH)/2 = (463.9 + 499.9)/2 = 481.9 mV`.
+
+β-ratio prediction, using `β = KP · W / L`:
+
+```
+β_p (3 PMOS parallel) = 3 × (40U × 180/45)  = 480U
+β_n (3 NMOS series)   = 3 × (120U × 270/45) = 2160U
+β_n/β_p = 4.5  →  √(β_n/β_p) = 2.121
+V_sp ≈ V_Tn + (V_DD − V_Tn − |V_Tp|) / (1 + √(β_n/β_p))
+     = 0.45 + (1 − 0.45 − 0.45) / 3.121
+     = 0.482 V = 482 mV
+```
+
+Predicted **482 mV** vs. measured **481.9 mV** — a 0.1 mV (0.02 %) match. Because
+`β_n > β_p`, the stronger NMOS stack pulls the switching point below `V_DD/2`, exactly as
+observed. The inverter path corroborates this: its midpoint is `(480.2 + 509.8)/2 = 495.0 mV
+= V_DD/2` exactly, as expected when `β_n ≈ β_p`. The agreement validates both the
+transistor sizing and the DC solver.
+
+### 10.5 Numerical residuals (not physical effects)
+
+- **`tt_off = 7.66 nV`.** With `EN = 0`, theory demands exactly 0 V. The residual comes
+  from `LAMBDA = 0.05/0.06` (channel-length modulation leaves a finite `R_on`, so
+  `V_OL = I·R_on ≠ 0`) plus solver tolerances (`abstol=1e-12`, `vntol=1e-6`). At eight
+  orders of magnitude below `V_DD` this is numerical noise, not a real offset.
+- **Faulty-vs-healthy Δ`t_pd` = +0.069 ps (+0.039 %).** The A0→Y1 and N3→Y3 paths are
+  logically independent, so the true difference is **exactly 0 ps**. The 0.069 ps is below
+  the 2 ps transient timestep and arises from differing solver convergence paths between
+  the two runs; it is not a physical effect.
+
+### Summary
+
+| Metric | Measured | Theory / real-45 nm | Nature of the gap |
+|---|---|---|---|
+| `t_pd` | 176.04 ps | ~45–75 ps | model 2.4–4× slow (quadratic I–V, high `V_t`, thick `Tox`, low `KP`) |
+| `P_avg` | 62.09 nW | dynamic + gate leakage | model has 0 leakage; value is a lower bound |
+| faulty `P_avg` | 54.54 nW (−12 %) | Y3 inverter stops switching | physically correct |
+| `NM_L`/`NM_H` | 480/490 mV | real ≈ 150–300 mV | model near theoretical max (500 mV); optimistic |
+| NAND `V_sp` | 481.9 mV | 482 mV (β-ratio) | 0.02 % match — validates sizing & solver |
+| `tt_off` | 7.66 nV | 0 V | numerical / `LAMBDA` residual |
+| Δ`t_pd` (faulty) | +0.069 ps | 0 ps | solver noise (< timestep) |
+
+---
+
+## 11. Conclusion
 
 A 36-transistor static CMOS 2-to-4 decoder with enable was designed and verified in Ngspice:
-all minterms are correct, `t_pd ≈ 176 ps`, `P_avg ≈ 62 pW`, and input noise margins are on the
+all minterms are correct, `t_pd ≈ 176 ps`, `P_avg ≈ 62 nW`, and input noise margins are on the
 order of 480–500 mV. A stuck-at-0 fault on `N3` was injected cleanly and shown to be **masked** by
 `EN=1,A1=1,A0=1` but **unambiguously detected** by `EN=1,A1=0,A0=0`, demonstrating the importance
 of choosing a fault-sensitizing vector rather than an arbitrary one.
