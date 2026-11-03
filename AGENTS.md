@@ -42,7 +42,9 @@ PULSE sources, 20 ns per pattern, one full 8-pattern cycle = 160 ns, two cycles 
 
 ## Measurements & gotchas (hard-earned)
 
-- **Power:** source is named exactly `V_DD`. `meas tran I_avg avg i(V_DD) from=160n to=320n` is negative (SPICE current flows into the source's + terminal), so flip sign: `let P_avg = -I_avg * 1.0`. Measured ≈ **62 pW** (outputs unloaded).
+- **Power:** source is named exactly `V_DD`. `meas tran I_avg avg i(V_DD) from=160n to=320n` is negative (SPICE current flows into the source's + terminal), so flip sign: `let P_avg = -I_avg * 1.0`. Measured ≈ **62 nW** with unloaded outputs — exactly
+`6.208868e-08 W = 62.08868 nW`; the unit is **nanowatts** (an earlier draft said "62 pW", a
+factor-1000 unit error — do not reintroduce it).
 - **Derivative noise-margin trap:** ngspice cannot evaluate `deriv()` inline in a `.meas WHEN`. Materialise it first: `let dv = deriv(v(Y1))` then `meas dc V_IL find v(A0) when dv=-1 cross=1`.
 - **But `deriv(Y1) = -1` does not exist for the specified bias.** With `EN=1, A1=0` the A0→Y1 path is a **buffer** (`Y1 = A0`), so its slope is never negative. The two spec-literal `v_il`/`v_ih` lines in `decoder_healthy.sp` are kept to document this and report "no crossing". The valid numbers come from the *inverting* transfers of the same input: `v(Y0)` (`Y0=A0'`, V_IL/V_IH ≈ 480/510 mV) and subckt node `v(xdec.n1)` (`=A0'`, ≈ 464/500 mV).
 - **Subcircuit nodes:** internal nodes must be addressed as `xdec.<node>` (e.g. `v(xdec.n1)`), never bare `v(N1)`.
