@@ -13,9 +13,16 @@ rule set (V_DD = 1.0 V, 36 transistors), together with a **DFT version** carryin
 | `report.md` | Engineering report: design, methodology, and measured results |
 | `AGENTS.md` | Notes for AI coding agents working in this repo (getchas, exact commands) |
 | `dc_healthy.txt` | Generated DC-sweep evidence (A0 sweep, V(Y1), V(Y0), V(N1), derivatives) |
+| `*.asc` / `*.asy` | LTspice schematic mirrors: `decoder_healthy.asc`, `decoder_dft_sa0.asc` (top level), `inv.asc` / `nand3.asc` (cell schematics), `mn.asy` / `mp.asy` / `vsrc_tb.asy` (device/testbench symbols) |
+| `fov_aat_ltspice.zip` | Zipped bundle of the LTspice schematic set above (byte-identical copy) |
 
 Both `.sp` netlists are **self-contained**: the 45 nm-level MOSFET model cards are embedded, so no
 external model library is required.
+
+**LTspice scope note:** the `.asc` mirrors carry only the transient analysis, `t_pd` and average
+power (`.tran 0 320n 0 20p` — 20 ps max step vs the ngspice 2 ps print step, so last-digit
+differences are expected). The truth-table spot checks, DC noise-margin sweep and DFT fault
+vectors exist only in the ngspice `.sp` netlists.
 
 ## Running
 
@@ -44,7 +51,7 @@ ngspice -b decoder_dft_sa0.sp 2>&1 | grep -E "y3_|n3_|n3float"
 | Metric | Value |
 |---|---|
 | Propagation delay `t_pd` (A0 ↑ → Y1 ↑) | **176 ps** |
-| Average power (one 160 ns cycle) | **62 pW** (healthy), 55 pW (faulty), unloaded outputs |
+| Average power (one 160 ns cycle) | **62.1 nW** (healthy; exactly 62.08868 nW), 54.5 nW (faulty), unloaded outputs — units are nanowatts |
 | V_IL / V_IH (A0 input) | **480 / 510 mV** (via `Y0 = A0'`) |
 | Truth table | all 4 enabled outputs correct; all zero when `EN = 0` |
 | SA0 on `N3` | **detected** by vector `EN=1,A1=0,A0=0`; **masked** by `EN=1,A1=1,A0=1` |
