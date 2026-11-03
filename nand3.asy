@@ -1,0 +1,47 @@
+Version 4
+SymbolType BLOCK
+LINE Normal 16 0 16 96
+LINE Normal 16 0 48 0
+LINE Normal 16 96 48 96
+LINE Normal 48 0 60 2
+LINE Normal 60 2 72 6
+LINE Normal 72 6 82 14
+LINE Normal 82 14 90 24
+LINE Normal 90 24 94 36
+LINE Normal 94 36 96 48
+LINE Normal 96 48 94 60
+LINE Normal 94 60 90 72
+LINE Normal 90 72 82 82
+LINE Normal 82 82 72 90
+LINE Normal 72 90 60 94
+LINE Normal 60 94 48 96
+CIRCLE Normal 96 44 104 52
+LINE Normal 0 16 16 16
+LINE Normal 0 48 16 48
+LINE Normal 0 80 16 80
+LINE Normal 104 48 112 48
+LINE Normal 48 -16 48 0
+LINE Normal 48 112 48 96
+TEXT 52 80 Center 1 NAND3
+WINDOW 0 52 40 Center 2
+SYMATTR Prefix X
+SYMATTR InstName X
+SYMATTR Description 3-input CMOS NAND (nand3.asc)
+PIN 112 48 NONE 0
+PINATTR PinName out
+PINATTR SpiceOrder 1
+PIN 0 16 NONE 0
+PINATTR PinName a
+PINATTR SpiceOrder 2
+PIN 0 48 NONE 0
+PINATTR PinName b
+PINATTR SpiceOrder 3
+PIN 0 80 NONE 0
+PINATTR PinName c
+PINATTR SpiceOrder 4
+PIN 48 -16 NONE 0
+PINATTR PinName vdd
+PINATTR SpiceOrder 5
+PIN 48 112 NONE 0
+PINATTR PinName vss
+PINATTR SpiceOrder 6
